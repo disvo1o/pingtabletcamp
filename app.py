@@ -290,7 +290,7 @@ async def start_handler(message: Message):
     if is_admin(message.from_user.id):
 
         await message.answer(
-            "👑 <b>Панель администратора CAMP WARS</b>\n\n"
+            "👑 <b>Панель администратора пинг таблем кэмп</b>\n\n"
             "Выбери действие:",
             reply_markup=admin_keyboard(),
             parse_mode="HTML",
@@ -318,7 +318,7 @@ async def home_handler(callback: CallbackQuery):
     if is_admin(callback.from_user.id):
 
         text = (
-            "👑 <b>Панель администратора CAMP WARS</b>\n\n"
+            "👑 <b>Панель администратора пинг таблет кэмп</b>\n\n"
             "Выбери действие:"
         )
 
@@ -531,7 +531,7 @@ async def scoreboard(callback: CallbackQuery):
     )
 
     text = (
-        "🏆 <b>ОБЩИЙ РЕЙТИНГ CAMP WARS</b>\n\n"
+        "🏆 <b>ОБЩИЙ РЕЙТИНГ пинг таблет кэмп</b>\n\n"
     )
 
     medals = [
