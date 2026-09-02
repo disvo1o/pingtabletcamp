@@ -1,0 +1,5 @@
+services:
+  - type: worker
+    name: camp-wars-bot
+    runtime: docker
+    dockerfilePath: ./Dockerfile
