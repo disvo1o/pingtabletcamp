@@ -152,6 +152,18 @@ class IssuedMission(Base):
 
 
 # ============================================================
+# НАСТРОЙКА ПУБЛИЧНОГО РЕЙТИНГА
+# ============================================================
+
+class ScoreboardConfig(Base):
+    __tablename__ = "scoreboard_config"
+
+    id = Column(Integer, primary_key=True, default=1)
+    chat_id = Column(BigInteger, nullable=False)
+    message_id = Column(Integer, nullable=False)
+
+
+# ============================================================
 # СОЗДАНИЕ ТАБЛИЦ
 # ============================================================
 
@@ -390,6 +402,62 @@ def set_user_team(user_id, team_id):
             user.team_id = team_id
 
         session.commit()
+
+
+# ============================================================
+# НАСТРОЙКА ПУБЛИЧНОГО РЕЙТИНГА — CRUD
+# ============================================================
+
+def get_scoreboard_config():
+    with SessionLocal() as session:
+        config = (
+            session.query(ScoreboardConfig)
+            .filter(ScoreboardConfig.id == 1)
+            .first()
+        )
+
+        if not config:
+            return None
+
+        return {
+            "chat_id": config.chat_id,
+            "message_id": config.message_id,
+        }
+
+
+def save_scoreboard_config(chat_id, message_id):
+    with SessionLocal() as session:
+        config = (
+            session.query(ScoreboardConfig)
+            .filter(ScoreboardConfig.id == 1)
+            .first()
+        )
+
+        if not config:
+            config = ScoreboardConfig(
+                id=1,
+                chat_id=chat_id,
+                message_id=message_id,
+            )
+            session.add(config)
+        else:
+            config.chat_id = chat_id
+            config.message_id = message_id
+
+        session.commit()
+
+
+def delete_scoreboard_config():
+    with SessionLocal() as session:
+        config = (
+            session.query(ScoreboardConfig)
+            .filter(ScoreboardConfig.id == 1)
+            .first()
+        )
+
+        if config:
+            session.delete(config)
+            session.commit()
 
 
 # ============================================================
