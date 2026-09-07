@@ -277,7 +277,7 @@ def build_scoreboard_text():
         reverse=True,
     )
 
-    text = "🏆 <b>ОБЩИЙ РЕЙТИНГ пинг таблет кэмп</b>\\n\\n"
+    text = "🏆 <b>ОБЩИЙ РЕЙТИНГ пинг таблет кэмп</b>\ \n\ \n"
 
     medals = [
         "🥇",
