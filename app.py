@@ -21,6 +21,9 @@ from database import (
     add_points,
     get_history,
     save_user,
+    get_scoreboard_config,
+    save_scoreboard_config,
+    delete_scoreboard_config,
 )
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -53,6 +56,10 @@ dp = Dispatcher()
 # Временное состояние действий администраторов.
 # Внешняя база для этого не нужна.
 pending_actions = {}
+
+# Один общий lock не даёт двум администраторам одновременно
+# редактировать одно и то же закреплённое сообщение рейтинга.
+scoreboard_lock = asyncio.Lock()
 
 
 # =========================================================
@@ -260,6 +267,164 @@ async def safe_edit(
 
 
 # =========================================================
+# ПУБЛИЧНЫЙ ЗАКРЕПЛЁННЫЙ РЕЙТИНГ
+# =========================================================
+
+def build_scoreboard_text():
+    teams = sorted(
+        get_teams(),
+        key=lambda team: team["score"],
+        reverse=True,
+    )
+
+    text = "🏆 <b>ОБЩИЙ РЕЙТИНГ пинг таблет кэмп</b>\\n\\n"
+
+    medals = [
+        "🥇",
+        "🥈",
+        "🥉",
+    ]
+
+    for index, team in enumerate(teams):
+        if index < 3:
+            prefix = medals[index]
+        else:
+            prefix = f"{index + 1}."
+
+        text += (
+            f"{prefix} "
+            f"<b>{html.escape(team['name'])}</b>"
+            f" — {team['score']} баллов\\n"
+        )
+
+    return text
+
+
+async def update_pinned_scoreboard():
+    async with scoreboard_lock:
+        config = get_scoreboard_config()
+
+        if not config:
+            return
+
+        text = build_scoreboard_text()
+
+        try:
+            await bot.edit_message_text(
+                chat_id=config["chat_id"],
+                message_id=config["message_id"],
+                text=text,
+                parse_mode="HTML",
+            )
+
+        except TelegramBadRequest as e:
+            error_text = str(e).lower()
+
+            if "message is not modified" in error_text:
+                return
+
+            if (
+                "message to edit not found" in error_text
+                or "message can't be edited" in error_text
+                or "message identifier is not specified" in error_text
+            ):
+                delete_scoreboard_config()
+
+                logger.warning(
+                    "Закреплённое сообщение рейтинга больше недоступно. "
+                    "Запусти /setup_scoreboard заново."
+                )
+
+                return
+
+            raise
+
+
+# =========================================================
+# НАСТРОЙКА ЗАКРЕПЛЁННОГО РЕЙТИНГА
+# =========================================================
+
+@dp.message(Command("setup_scoreboard"))
+async def setup_scoreboard_handler(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
+    if message.chat.type not in ("group", "supergroup"):
+        await message.answer(
+            "❌ Эту команду нужно выполнить в целевом групповом чате."
+        )
+        return
+
+    text = build_scoreboard_text()
+
+    try:
+        old_config = get_scoreboard_config()
+
+        # Если рейтинг уже настроен и старое сообщение существует,
+        # просто обновляем и закрепляем его повторно.
+        if old_config:
+            try:
+                await bot.edit_message_text(
+                    chat_id=old_config["chat_id"],
+                    message_id=old_config["message_id"],
+                    text=text,
+                    parse_mode="HTML",
+                )
+
+                await bot.pin_chat_message(
+                    chat_id=old_config["chat_id"],
+                    message_id=old_config["message_id"],
+                    disable_notification=True,
+                )
+
+                if (
+                    old_config["chat_id"] == message.chat.id
+                ):
+                    await message.answer(
+                        "✅ Закреплённый рейтинг уже настроен и обновлён."
+                    )
+                    return
+
+            except TelegramBadRequest:
+                delete_scoreboard_config()
+
+        scoreboard_message = await message.answer(
+            text,
+            parse_mode="HTML",
+        )
+
+        await bot.pin_chat_message(
+            chat_id=message.chat.id,
+            message_id=scoreboard_message.message_id,
+            disable_notification=True,
+        )
+
+        save_scoreboard_config(
+            chat_id=message.chat.id,
+            message_id=scoreboard_message.message_id,
+        )
+
+        await message.answer(
+            "✅ <b>Публичный рейтинг настроен.</b>\\n\\n"
+            "Это сообщение теперь будет автоматически "
+            "обновляться после изменения баллов.",
+            parse_mode="HTML",
+        )
+
+    except TelegramBadRequest as e:
+        logger.exception(
+            "Не удалось настроить публичный рейтинг: %s",
+            e,
+        )
+
+        await message.answer(
+            "❌ Не удалось закрепить рейтинг.\\n\\n"
+            "Проверь, что бот является администратором этого чата "
+            "и имеет право закреплять сообщения."
+        )
+
+
+# =========================================================
 # ГЛАВНЫЙ ЭКРАН
 # =========================================================
 
@@ -449,6 +614,8 @@ async def win_handler(callback: CallbackQuery):
         activity="Победа",
     )
 
+    await update_pinned_scoreboard()
+
     clear_action(callback.from_user.id)
 
     await safe_edit(
@@ -524,34 +691,7 @@ async def scoreboard(callback: CallbackQuery):
 
     clear_action(callback.from_user.id)
 
-    teams = sorted(
-        get_teams(),
-        key=lambda team: team["score"],
-        reverse=True,
-    )
-
-    text = (
-        "🏆 <b>ОБЩИЙ РЕЙТИНГ пинг таблет кэмп</b>\n\n"
-    )
-
-    medals = [
-        "🥇",
-        "🥈",
-        "🥉",
-    ]
-
-    for index, team in enumerate(teams):
-
-        if index < 3:
-            prefix = medals[index]
-        else:
-            prefix = f"{index + 1}."
-
-        text += (
-            f"{prefix} "
-            f"<b>{html.escape(team['name'])}</b>"
-            f" — {team['score']} баллов\n"
-        )
+    text = build_scoreboard_text()
 
     if is_admin(callback.from_user.id):
         keyboard = admin_keyboard()
@@ -790,6 +930,8 @@ async def text_handler(message: Message):
             text,
         )
 
+        await update_pinned_scoreboard()
+
         clear_action(
             message.from_user.id
         )
@@ -850,6 +992,8 @@ async def text_handler(message: Message):
             first_name=message.from_user.first_name,
             activity="Ручное начисление",
         )
+
+        await update_pinned_scoreboard()
 
         clear_action(
             message.from_user.id
