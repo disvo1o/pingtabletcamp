@@ -277,7 +277,7 @@ def build_scoreboard_text():
         reverse=True,
     )
 
-    text = "🏆 <b>ОБЩИЙ РЕЙТИНГ пинг таблет кэмп</b>\ \n\ \n"
+    text = "🏆 <b>ОБЩИЙ РЕЙТИНГ пинг таблет кэмп</b>\n\n"
 
     medals = [
         "🥇",
@@ -294,7 +294,7 @@ def build_scoreboard_text():
         text += (
             f"{prefix} "
             f"<b>{html.escape(team['name'])}</b>"
-            f" — {team['score']} баллов\\n"
+            f" — {team['score']} баллов\n"
         )
 
     return text
@@ -405,7 +405,7 @@ async def setup_scoreboard_handler(message: Message):
         )
 
         await message.answer(
-            "✅ <b>Публичный рейтинг настроен.</b>\\n\\n"
+            "✅ <b>Публичный рейтинг настроен.</b>\n\n"
             "Это сообщение теперь будет автоматически "
             "обновляться после изменения баллов.",
             parse_mode="HTML",
@@ -418,7 +418,7 @@ async def setup_scoreboard_handler(message: Message):
         )
 
         await message.answer(
-            "❌ Не удалось закрепить рейтинг.\\n\\n"
+            "❌ Не удалось закрепить рейтинг.\n\n"
             "Проверь, что бот является администратором этого чата "
             "и имеет право закреплять сообщения."
         )
@@ -441,6 +441,9 @@ def home_text():
 
 @dp.message(Command("start"))
 async def start_handler(message: Message):
+
+    if not is_admin(message.from_user.id):
+        return
 
     # Регистрируем пользователя в базе.
     save_user(
@@ -477,6 +480,13 @@ async def start_handler(message: Message):
 
 @dp.callback_query(F.data == "home")
 async def home_handler(callback: CallbackQuery):
+
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Бот доступен только администраторам.",
+            show_alert=True,
+        )
+        return
 
     clear_action(callback.from_user.id)
 
@@ -640,6 +650,13 @@ async def win_handler(callback: CallbackQuery):
 async def custom_points_start(callback: CallbackQuery):
 
     if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Бот доступен только администраторам.",
+            show_alert=True,
+        )
+        return
+
+    if not is_admin(callback.from_user.id):
 
         await callback.answer(
             "⛔ Нет доступа.",
@@ -689,6 +706,13 @@ async def custom_points_start(callback: CallbackQuery):
 @dp.callback_query(F.data == "scoreboard")
 async def scoreboard(callback: CallbackQuery):
 
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Бот доступен только администраторам.",
+            show_alert=True,
+        )
+        return
+
     clear_action(callback.from_user.id)
 
     text = build_scoreboard_text()
@@ -714,6 +738,13 @@ async def scoreboard(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "history")
 async def history_handler(callback: CallbackQuery):
+
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Бот доступен только администраторам.",
+            show_alert=True,
+        )
+        return
 
     clear_action(callback.from_user.id)
 
@@ -798,6 +829,13 @@ async def history_handler(callback: CallbackQuery):
 @dp.callback_query(F.data == "teams")
 async def teams_handler(callback: CallbackQuery):
 
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Бот доступен только администраторам.",
+            show_alert=True,
+        )
+        return
+
     clear_action(callback.from_user.id)
 
     teams = get_teams()
@@ -842,6 +880,13 @@ async def teams_handler(callback: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("rename:"))
 async def rename_start(callback: CallbackQuery):
+
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Бот доступен только администраторам.",
+            show_alert=True,
+        )
+        return
 
     if not is_admin(callback.from_user.id):
 
