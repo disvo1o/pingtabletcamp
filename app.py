@@ -273,31 +273,30 @@ async def safe_edit(
 def build_scoreboard_text():
     teams = sorted(
         get_teams(),
-        key=lambda team: team["score"],
+        key=lambda team: int(team["score"]),
         reverse=True,
     )
 
-    text = "🏆 <b>ОБЩИЙ РЕЙТИНГ пинг таблет кэмп</b>\n\n"
-
-    medals = [
-        "🥇",
-        "🥈",
-        "🥉",
+    lines = [
+        "🏆 ПИНГ ТАБЛЕТ КЭМП",
+        "",
+        " #    КОМАНДА             ОЧКИ",
+        "──────────────────────────────",
     ]
 
-    for index, team in enumerate(teams):
-        if index < 3:
-            prefix = medals[index]
-        else:
-            prefix = f"{index + 1}."
+    medals = ["🥇", "🥈", "🥉"]
 
-        text += (
-            f"{prefix} "
-            f"<b>{html.escape(team['name'])}</b>"
-            f" — {team['score']} баллов\n"
-        )
+    for position, team in enumerate(teams, start=1):
+        rank = medals[position - 1] if position <= 3 else str(position)
+        name = str(team["name"])[:18]
+        points = int(team["score"])
 
-    return text
+        lines.append(f"{rank:<4} {name:<18} {points:>6}")
+
+    lines.append("──────────────────────────────")
+
+    # <pre> нужен для моноширинного шрифта, чтобы колонки всегда были ровными.
+    return "<pre>" + html.escape("\n".join(lines)) + "</pre>"
 
 
 async def update_pinned_scoreboard():
@@ -490,19 +489,19 @@ async def home_handler(callback: CallbackQuery):
 
     clear_action(callback.from_user.id)
 
-    if is_admin(callback.from_user.id):
-
-        text = (
-            "👑 <b>Панель администратора пинг таблет кэмп</b>\n\n"
-            "Выбери действие:"
+    if not is_admin(callback.from_user.id):
+        await callback.answer(
+            "⛔ Бот доступен только администраторам.",
+            show_alert=True,
         )
+        return
 
-        keyboard = admin_keyboard()
+    text = (
+        "👑 <b>Панель администратора пинг таблет кэмп</b>\n\n"
+        "Выбери действие:"
+    )
 
-    else:
-
-        text = home_text()
-        keyboard = user_keyboard()
+    keyboard = admin_keyboard()
 
     await safe_edit(
         callback,
@@ -656,15 +655,6 @@ async def custom_points_start(callback: CallbackQuery):
         )
         return
 
-    if not is_admin(callback.from_user.id):
-
-        await callback.answer(
-            "⛔ Нет доступа.",
-            show_alert=True,
-        )
-
-        return
-
     team_id = int(
         callback.data.split(":")[1]
     )
@@ -705,7 +695,6 @@ async def custom_points_start(callback: CallbackQuery):
 
 @dp.callback_query(F.data == "scoreboard")
 async def scoreboard(callback: CallbackQuery):
-
     if not is_admin(callback.from_user.id):
         await callback.answer(
             "⛔ Бот доступен только администраторам.",
@@ -715,17 +704,10 @@ async def scoreboard(callback: CallbackQuery):
 
     clear_action(callback.from_user.id)
 
-    text = build_scoreboard_text()
-
-    if is_admin(callback.from_user.id):
-        keyboard = admin_keyboard()
-    else:
-        keyboard = user_keyboard()
-
     await safe_edit(
         callback,
-        text,
-        keyboard,
+        build_scoreboard_text(),
+        admin_keyboard(),
     )
 
     await callback.answer()
@@ -807,15 +789,10 @@ async def history_handler(callback: CallbackQuery):
                 f"🕐 {row['created_at']}\n\n"
             )
 
-    if is_admin(callback.from_user.id):
-        keyboard = admin_keyboard()
-    else:
-        keyboard = user_keyboard()
-
     await safe_edit(
         callback,
         text,
-        keyboard,
+        admin_keyboard(),
     )
 
     await callback.answer()
@@ -849,20 +826,12 @@ async def teams_handler(callback: CallbackQuery):
             f" — {team['score']} баллов\n"
         )
 
-    # Администратор может переименовывать команды.
-    if is_admin(callback.from_user.id):
+    text += (
+        "\nВыбери команду, "
+        "чтобы изменить название:"
+    )
 
-        text += (
-            "\nВыбери команду, "
-            "чтобы изменить название:"
-        )
-
-        keyboard = rename_keyboard()
-
-    # Обычный пользователь только смотрит список.
-    else:
-
-        keyboard = user_keyboard()
+    keyboard = rename_keyboard()
 
     await safe_edit(
         callback,
